@@ -29,6 +29,13 @@ type Sync struct {
 	S3                  *S3     `json:"s3"`                  // S3 对象存储服务配置
 	WebDAV              *WebDAV `json:"webdav"`              // WebDAV 服务配置
 	Local               *Local  `json:"local"`               // 本地文件系统 服务配置
+	Iroh                *Iroh   `json:"iroh"`                // Iroh P2P 同步配置
+}
+
+type Iroh struct {
+	Ticket      string            `json:"ticket"`      // Iroh node ticket
+	DeviceNames map[string]string `json:"deviceNames"` // 节点本地备注名称 NodeKey -> Nickname
+	SecretKey   []byte            `json:"secretKey"`   // Iroh node secret key
 }
 
 func NewSync() *Sync {
@@ -75,6 +82,7 @@ const (
 	ProviderS3     = 2 // ProviderS3 为 S3 协议对象存储提供的云端存储服务
 	ProviderWebDAV = 3 // ProviderWebDAV 为 WebDAV 协议提供的云端存储服务
 	ProviderLocal  = 4 // ProviderLocal 为本地文件系统提供的存储服务
+	ProviderIroh   = 5 // ProviderIroh 为 Iroh P2P 提供的云端存储服务
 )
 
 func ProviderToStr(provider int) string {
@@ -87,6 +95,8 @@ func ProviderToStr(provider int) string {
 		return "WebDAV"
 	case ProviderLocal:
 		return "Local File System"
+	case ProviderIroh:
+		return "Iroh P2P"
 	}
 	return "Unknown"
 }

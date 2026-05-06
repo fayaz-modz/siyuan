@@ -153,7 +153,7 @@ export const syncGuide = (app?: App) => {
         if (needSubscribe()) {
             return;
         }
-    } else if (!isPaidUser()) {
+    } else if (window.siyuan.config.sync.provider !== 5 && !isPaidUser()) {
         showMessage(window.siyuan.languages["_kernel"][214].replaceAll("${accountServer}", getCloudURL("")));
         return;
     }
@@ -171,7 +171,7 @@ export const syncGuide = (app?: App) => {
         }
         return;
     }
-    if (0 !== window.siyuan.config.sync.provider && !isPaidUser() && app) {
+    if (0 !== window.siyuan.config.sync.provider && window.siyuan.config.sync.provider !== 5 && !isPaidUser() && app) {
         showMessage(window.siyuan.languages["_kernel"][214].replaceAll("${accountServer}", getCloudURL("")));
         return;
     }

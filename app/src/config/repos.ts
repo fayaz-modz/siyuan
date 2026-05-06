@@ -1,11 +1,11 @@
-import {isPaidUser, needSubscribe} from "../util/needSubscribe";
-import {fetchPost, fetchSyncPost} from "../util/fetch";
-import {showMessage} from "../dialog/message";
-import {bindSyncCloudListEvent, getSyncCloudList} from "../sync/syncGuide";
-import {processSync} from "../dialog/processSystem";
-import {getCloudURL} from "./util/about";
-import {openByMobile} from "../protyle/util/compatibility";
-import {confirmDialog} from "../dialog/confirmDialog";
+import { isPaidUser, needSubscribe } from "../util/needSubscribe";
+import { fetchPost, fetchSyncPost } from "../util/fetch";
+import { showMessage } from "../dialog/message";
+import { bindSyncCloudListEvent, getSyncCloudList } from "../sync/syncGuide";
+import { processSync } from "../dialog/processSystem";
+import { getCloudURL } from "./util/about";
+import { openByMobile } from "../protyle/util/compatibility";
+import { confirmDialog } from "../dialog/confirmDialog";
 
 const renderProvider = (provider: number) => {
     if (provider === 0) {
@@ -39,17 +39,17 @@ const renderProvider = (provider: number) => {
     ${window.siyuan.languages.syncOfficialProviderIntro}
 </div>`;
     }
-    if (!isPaidUser()) {
-        return `<div>
+if (!isPaidUser() && provider !== 5) {
+    return `<div>
     ${window.siyuan.languages["_kernel"][214].replaceAll("${accountServer}", getCloudURL(""))}
 </div>
 <div class="ft__error${provider == 4 ? "" : " fn__none"}">
     <div class="fn__hr--b"></div>
     ${window.siyuan.languages.mobileNotSupport}
 </div>`;
-    }
-    if (provider === 2) {
-        return `<div class="b3-label b3-label--inner">
+}
+if (provider === 2) {
+    return `<div class="b3-label b3-label--inner">
     ${window.siyuan.languages.syncThirdPartyProviderS3Intro}
     <div class="fn__hr"></div>
     <em>${window.siyuan.languages.proFeature}</em>
@@ -125,8 +125,8 @@ const renderProvider = (provider: number) => {
         <svg><use xlink:href="#iconUpload"></use></svg>${window.siyuan.languages.export}
     </button>
 </div>`;
-    } else if (provider === 3) {
-        return `<div class="b3-label b3-label--inner">
+} else if (provider === 3) {
+    return `<div class="b3-label b3-label--inner">
     ${window.siyuan.languages.syncThirdPartyProviderWebDAVIntro}
     <div class="fn__hr"></div>
     <em>${window.siyuan.languages.proFeature}</em>
@@ -184,8 +184,8 @@ const renderProvider = (provider: number) => {
         <svg><use xlink:href="#iconUpload"></use></svg>${window.siyuan.languages.export}
     </button>
 </div>`;
-    } else if (provider === 4) {
-        return `<div class="b3-label b3-label--inner">
+} else if (provider === 4) {
+    return `<div class="b3-label b3-label--inner">
     <div class="ft__error">
         ${window.siyuan.languages.mobileNotSupport}
     </div>
@@ -209,12 +209,27 @@ const renderProvider = (provider: number) => {
     <div class="fn__space"></div>
     <input id="localConcurrentReqs" class="b3-text-field fn__block" type="number" min="1" max="1024">
 </div>`;
-    }
+} else if (provider === 5) {
+    return `<div class="b3-label b3-label--inner">
+    Iroh P2P Sync Swarm Configuration
+    <div class="fn__hr"></div>
+    Sync privately and directly across your devices using Iroh. Priority ranking determines the active central device.
+</div>
+<div class="b3-label b3-label--inner fn__flex">
+    <div class="fn__flex-center fn__size200">Iroh Ticket</div>
+    <div class="fn__space"></div>
+    <input id="irohTicket" class="b3-text-field fn__block" placeholder="Paste your Iroh ticket here to join a swarm...">
+</div>
+<div class="b3-label b3-label--inner" id="irohSwarmDashboard">
+    <!-- Dashboard content loaded asynchronously -->
+    Loading Swarm State...
+</div>`;
+}
     return "";
 };
 
 const fillSyncProviderPanelValues = (panel: Element) => {
-    if (!isPaidUser()) {
+    if (!isPaidUser() && window.siyuan.config.sync.provider !== 5) {
         return;
     }
     const provider = window.siyuan.config.sync.provider;
@@ -242,6 +257,69 @@ const fillSyncProviderPanelValues = (panel: Element) => {
         (panel.querySelector("#endpoint") as HTMLInputElement).value = String(local.endpoint);
         (panel.querySelector("#timeout") as HTMLInputElement).value = String(local.timeout);
         (panel.querySelector("#localConcurrentReqs") as HTMLInputElement).value = String(local.concurrentReqs);
+    } else if (provider === 5) {
+        const iroh = window.siyuan.config.sync.iroh;
+        if (iroh) {
+            (panel.querySelector("#irohTicket") as HTMLInputElement).value = String(iroh.ticket || "");
+        }
+
+        // Fetch and render swarm state
+        fetchPost("/api/sync/getIrohSwarmState", {}, (response) => {
+            const dashboard = panel.querySelector("#irohSwarmDashboard");
+            if (response.code === 0 && dashboard) {
+                const state = response.data;
+                const docTicketDisplay = state.docTicket
+                    ? `<div class="fn__flex b3-label">
+                        <div class="fn__flex-1">
+                            Shared Doc Ticket
+                            <div class="b3-label__text">Share this with other devices so they can join the same swarm. If you joined another device, this shows their ticket.</div>
+                        </div>
+                        <div class="fn__flex fn__flex-center" style="width: 50%; gap: 4px">
+                            <input id="irohDocTicket" class="b3-text-field fn__flex-1" readonly value="${state.docTicket}">
+                            <button class="b3-button b3-button--outline" onclick="navigator.clipboard.writeText('${state.docTicket}').then(()=>this.textContent='Copied!').catch(()=>{})" style="white-space:nowrap">Copy</button>
+                        </div>
+                    </div>`
+                    : ``;
+
+                let html = `
+                    <div class="fn__flex b3-label">
+                        <div class="fn__flex-1">
+                            My Node Key
+                            <div class="b3-label__text">Your stable Iroh identity</div>
+                        </div>
+                        <input class="b3-text-field fn__flex-center" style="width: 50%" readonly value="${state.nodeKey || ''}">
+                    </div>
+                    ${docTicketDisplay}
+                    <div style="padding: 8px 0 4px"><strong>Devices</strong></div>
+                    <ul class="b3-list" id="irohPriorityList">`;
+
+                let peers = [...(state.priorityList || [])];
+                const allSources = [
+                    ...(state.onlinePeers || []),
+                    ...(iroh && iroh.deviceNames ? Object.keys(iroh.deviceNames) : []),
+                    state.nodeKey
+                ];
+                allSources.forEach(p => {
+                    if (p && !peers.includes(p)) peers.push(p);
+                });
+
+                if (peers.length === 0) {
+                    html += `<li class="b3-list-item"><span class="b3-list-item__text" style="color:var(--b3-theme-on-surface-light)">No devices yet. Share your ticket with another device.</span></li>`;
+                }
+                peers.forEach((peer: string) => {
+                    const nickname = (iroh && iroh.deviceNames && iroh.deviceNames[peer]) ? iroh.deviceNames[peer] : peer.slice(0, 20) + "...";
+                    const isMe = state.nodeKey === peer;
+                    const isLeader = state.leader === peer;
+                    html += `<li class="b3-list-item" data-nodekey="${peer}" title="${peer}">
+                        <span class="b3-list-item__text">
+                            ${nickname}${isMe ? ' <em>(This device)</em>' : ''}${isLeader ? ' 🌟' : ''}
+                        </span>
+                    </li>`;
+                });
+                html += `</ul>`;
+                dashboard.innerHTML = html;
+            }
+        });
     }
 };
 
@@ -336,6 +414,11 @@ const bindProviderEvent = () => {
     const providerPanelElement = repos.element.querySelector("#syncProviderPanel");
     fillSyncProviderPanelValues(providerPanelElement);
     providerPanelElement.querySelectorAll(".b3-text-field, .b3-select").forEach(item => {
+        item.addEventListener("keyup", (event: KeyboardEvent) => {
+            if (event.key === "Enter") {
+                (item as HTMLElement).blur();
+            }
+        });
         item.addEventListener("blur", () => {
             if (window.siyuan.config.sync.provider === 2) {
                 const s3TimeoutInput = providerPanelElement.querySelector("#timeout") as HTMLInputElement;
@@ -370,7 +453,7 @@ const bindProviderEvent = () => {
                     concurrentReqs: concurrentReqs,
                 };
                 // 使用 fetchSyncPost：内核返回 code < 0 时 fetchPost 不会调用回调，此处需始终回写界面与已保存配置一致
-                fetchSyncPost("/api/sync/setSyncProviderS3", {s3})
+                fetchSyncPost("/api/sync/setSyncProviderS3", { s3 })
                     .then((response) => {
                         if (response.code === 0 && response.data?.s3) {
                             window.siyuan.config.sync.s3 = response.data.s3;
@@ -379,7 +462,7 @@ const bindProviderEvent = () => {
                     .finally(() => {
                         fillSyncProviderPanelValues(providerPanelElement);
                     })
-                    .catch(() => {});
+                    .catch(() => { });
             } else if (window.siyuan.config.sync.provider === 3) {
                 const webdavTimeoutInput = providerPanelElement.querySelector("#timeout") as HTMLInputElement;
                 let timeout = parseInt(webdavTimeoutInput.value, 10);
@@ -405,7 +488,7 @@ const bindProviderEvent = () => {
                     timeout: timeout,
                     concurrentReqs: concurrentReqs,
                 };
-                fetchSyncPost("/api/sync/setSyncProviderWebDAV", {webdav})
+                fetchSyncPost("/api/sync/setSyncProviderWebDAV", { webdav })
                     .then((response) => {
                         if (response.code === 0 && response.data?.webdav) {
                             window.siyuan.config.sync.webdav = response.data.webdav;
@@ -414,7 +497,7 @@ const bindProviderEvent = () => {
                     .finally(() => {
                         fillSyncProviderPanelValues(providerPanelElement);
                     })
-                    .catch(() => {});
+                    .catch(() => { });
             } else if (window.siyuan.config.sync.provider === 4) {
                 const localTimeoutInput = providerPanelElement.querySelector("#timeout") as HTMLInputElement;
                 let timeout = parseInt(localTimeoutInput.value, 10);
@@ -437,7 +520,7 @@ const bindProviderEvent = () => {
                     timeout: timeout,
                     concurrentReqs: concurrentReqs,
                 };
-                fetchSyncPost("/api/sync/setSyncProviderLocal", {local})
+                fetchSyncPost("/api/sync/setSyncProviderLocal", { local })
                     .then((response) => {
                         if (response.code === 0 && response.data?.local) {
                             window.siyuan.config.sync.local = response.data.local;
@@ -446,7 +529,21 @@ const bindProviderEvent = () => {
                     .finally(() => {
                         fillSyncProviderPanelValues(providerPanelElement);
                     })
-                    .catch(() => {});
+                    .catch(() => { });
+            } else if (window.siyuan.config.sync.provider === 5) {
+                const iroh = {
+                    ticket: (providerPanelElement.querySelector("#irohTicket") as HTMLInputElement).value.trim(),
+                };
+                fetchSyncPost("/api/sync/setSyncProviderIroh", { iroh })
+                    .then((response) => {
+                        if (response.code === 0 && response.data?.iroh) {
+                            window.siyuan.config.sync.iroh = response.data.iroh;
+                        }
+                    })
+                    .finally(() => {
+                        fillSyncProviderPanelValues(providerPanelElement);
+                    })
+                    .catch(() => { });
             }
         });
     });
@@ -466,6 +563,7 @@ export const repos = {
         <option value="2" ${window.siyuan.config.sync.provider === 2 ? "selected" : ""}>S3</option>
         <option value="3" ${window.siyuan.config.sync.provider === 3 ? "selected" : ""}>WebDAV</option>
         <option class="${!["std", "docker"].includes(window.siyuan.config.system.container) ? "fn__none" : ""}" value="4" ${window.siyuan.config.sync.provider === 4 ? "selected" : ""}>${window.siyuan.languages.localFileSystem}</option>
+        <option value="5" ${window.siyuan.config.sync.provider === 5 ? "selected" : ""}>Iroh P2P</option>
     </select>
 </div>
 <div id="syncProviderPanel" class="b3-label">
@@ -549,7 +647,7 @@ export const repos = {
                 showMessage(window.siyuan.languages._kernel[123]);
                 return;
             }
-            fetchPost("/api/sync/setSyncEnable", {enabled: switchElement.checked}, () => {
+            fetchPost("/api/sync/setSyncEnable", { enabled: switchElement.checked }, () => {
                 window.siyuan.config.sync.enabled = switchElement.checked;
                 processSync();
             });
@@ -564,27 +662,27 @@ export const repos = {
                 interval = 43200;
             }
             syncIntervalElement.value = interval.toString();
-            fetchPost("/api/sync/setSyncInterval", {interval: interval}, () => {
+            fetchPost("/api/sync/setSyncInterval", { interval: interval }, () => {
                 window.siyuan.config.sync.interval = interval;
                 processSync();
             });
         });
         const syncPerceptionElement = repos.element.querySelector("#syncPerception") as HTMLInputElement;
         syncPerceptionElement.addEventListener("change", () => {
-            fetchPost("/api/sync/setSyncPerception", {enabled: syncPerceptionElement.checked}, () => {
+            fetchPost("/api/sync/setSyncPerception", { enabled: syncPerceptionElement.checked }, () => {
                 window.siyuan.config.sync.perception = syncPerceptionElement.checked;
                 processSync();
             });
         });
         const switchConflictElement = repos.element.querySelector("#generateConflictDoc") as HTMLInputElement;
         switchConflictElement.addEventListener("change", () => {
-            fetchPost("/api/sync/setSyncGenerateConflictDoc", {enabled: switchConflictElement.checked}, () => {
+            fetchPost("/api/sync/setSyncGenerateConflictDoc", { enabled: switchConflictElement.checked }, () => {
                 window.siyuan.config.sync.generateConflictDoc = switchConflictElement.checked;
             });
         });
         const syncModeElement = repos.element.querySelector("#syncMode") as HTMLSelectElement;
         syncModeElement.addEventListener("change", () => {
-            fetchPost("/api/sync/setSyncMode", {mode: parseInt(syncModeElement.value, 10)}, () => {
+            fetchPost("/api/sync/setSyncMode", { mode: parseInt(syncModeElement.value, 10) }, () => {
                 if (syncModeElement.value === "1" && window.siyuan.config.sync.provider === 0 && window.siyuan.config.system.container !== "docker") {
                     syncPerceptionElement.parentElement.classList.remove("fn__none");
                 } else {
@@ -601,7 +699,7 @@ export const repos = {
         const syncConfigElement = repos.element.querySelector("#reposCloudSyncList");
         const syncProviderElement = repos.element.querySelector("#syncProvider") as HTMLSelectElement;
         syncProviderElement.addEventListener("change", () => {
-            fetchPost("/api/sync/setSyncProvider", {provider: parseInt(syncProviderElement.value, 10)}, (response) => {
+            fetchPost("/api/sync/setSyncProvider", { provider: parseInt(syncProviderElement.value, 10) }, (response) => {
                 if (response.code === 1) {
                     showMessage(response.msg);
                     syncProviderElement.value = "0";

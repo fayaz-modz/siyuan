@@ -260,6 +260,8 @@ func checkSync(boot, exit, byHand bool) bool {
 			Conf.Save()
 			return false
 		}
+	case conf.ProviderIroh:
+		// Iroh P2P is self-hosted, no subscription required
 	}
 
 	if 7 < autoSyncErrCount && !byHand {
@@ -443,6 +445,25 @@ func SetSyncProviderS3(s3 *conf.S3) (err error) {
 
 	Conf.Sync.S3 = s3
 	Conf.Save()
+	return
+}
+
+func SetSyncProviderIroh(iroh *conf.Iroh) (err error) {
+	iroh.Ticket = strings.TrimSpace(iroh.Ticket)
+	if iroh.DeviceNames == nil {
+		iroh.DeviceNames = make(map[string]string)
+	}
+
+	if Conf.Sync.Iroh != nil && len(Conf.Sync.Iroh.SecretKey) == 32 {
+		iroh.SecretKey = Conf.Sync.Iroh.SecretKey
+	}
+
+	Conf.Sync.Iroh = iroh
+	Conf.Save()
+
+	if globalIrohNode != nil {
+		err = globalIrohNode.Join(iroh.Ticket)
+	}
 	return
 }
 
@@ -725,6 +746,8 @@ func isProviderOnline(byHand bool) (ret bool) {
 		skipTlsVerify = Conf.Sync.WebDAV.SkipTlsVerify
 	case conf.ProviderLocal:
 		checkURL = "file://" + Conf.Sync.Local.Endpoint
+	case conf.ProviderIroh:
+		return true // P2P nodes are always considered "online" for sync triggering
 	default:
 		logging.LogWarnf("unknown provider: %d", Conf.Sync.Provider)
 		return false

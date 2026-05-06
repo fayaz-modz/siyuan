@@ -797,6 +797,109 @@ func setSyncProviderLocal(c *gin.Context) {
 	}
 }
 
+func setSyncProviderIroh(c *gin.Context) {
+	ret := gulu.Ret.NewResult()
+	defer c.JSON(http.StatusOK, ret)
+
+	arg, ok := util.JsonArg(c, ret)
+	if !ok {
+		return
+	}
+
+	var irohArg map[string]any
+	if !util.ParseJsonArgs(arg, ret, util.BindJsonArg("iroh", &irohArg, true, false)) {
+		return
+	}
+	data, err := gulu.JSON.MarshalJSON(irohArg)
+	if err != nil {
+		ret.Code = -1
+		ret.Msg = err.Error()
+		ret.Data = map[string]any{"closeTimeout": 5000}
+		return
+	}
+
+	iroh := &conf.Iroh{}
+	if err = gulu.JSON.UnmarshalJSON(data, iroh); err != nil {
+		ret.Code = -1
+		ret.Msg = err.Error()
+		ret.Data = map[string]any{"closeTimeout": 5000}
+		return
+	}
+
+	err = model.SetSyncProviderIroh(iroh)
+	if err != nil {
+		ret.Code = -1
+		ret.Msg = err.Error()
+		ret.Data = map[string]any{"closeTimeout": 5000}
+		return
+	}
+
+	ret.Data = map[string]any{
+		"iroh": model.Conf.Sync.Iroh,
+	}
+}
+
+func getIrohSwarmState(c *gin.Context) {
+	ret := gulu.Ret.NewResult()
+	defer c.JSON(http.StatusOK, ret)
+
+	node := model.InitIrohNode("")
+	ret.Data = node.GetSwarmState()
+}
+
+func setIrohPriority(c *gin.Context) {
+	ret := gulu.Ret.NewResult()
+	defer c.JSON(http.StatusOK, ret)
+
+	arg, ok := util.JsonArg(c, ret)
+	if !ok {
+		return
+	}
+
+	var priorityList []string
+	if !util.ParseJsonArgs(arg, ret, util.BindJsonArg("priorityList", &priorityList, true, false)) {
+		return
+	}
+
+	node := model.InitIrohNode("")
+	err := node.SyncPriorityList(priorityList)
+	if err != nil {
+		ret.Code = -1
+		ret.Msg = err.Error()
+	}
+}
+
+func setIrohDeviceName(c *gin.Context) {
+	ret := gulu.Ret.NewResult()
+	defer c.JSON(http.StatusOK, ret)
+
+	arg, ok := util.JsonArg(c, ret)
+	if !ok {
+		return
+	}
+
+	var nodeKey, nickname string
+	if !util.ParseJsonArgs(arg, ret, util.BindJsonArg("nodeKey", &nodeKey, true, false),
+		util.BindJsonArg("nickname", &nickname, true, false)) {
+		return
+	}
+
+	iroh := model.Conf.Sync.Iroh
+	if iroh == nil {
+		iroh = &conf.Iroh{DeviceNames: make(map[string]string)}
+	}
+	if iroh.DeviceNames == nil {
+		iroh.DeviceNames = make(map[string]string)
+	}
+	iroh.DeviceNames[nodeKey] = nickname
+	
+	err := model.SetSyncProviderIroh(iroh)
+	if err != nil {
+		ret.Code = -1
+		ret.Msg = err.Error()
+	}
+}
+
 func setCloudSyncDir(c *gin.Context) {
 	ret := gulu.Ret.NewResult()
 	defer c.JSON(http.StatusOK, ret)

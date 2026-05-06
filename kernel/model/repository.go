@@ -917,6 +917,8 @@ func DownloadCloudSnapshot(tag, id string) (err error) {
 			util.PushErrMsg(Conf.Language(214), 5000)
 			return
 		}
+	case conf.ProviderIroh:
+		// Iroh is self-hosted, no subscription required
 	}
 
 	defer util.PushClearProgress()
@@ -959,6 +961,8 @@ func UploadCloudSnapshot(tag, id string) (err error) {
 			util.PushErrMsg(Conf.Language(214), 5000)
 			return
 		}
+	case conf.ProviderIroh:
+		// Iroh is self-hosted, no subscription required
 	}
 
 	util.PushEndlessProgress(Conf.Language(116))
@@ -1000,6 +1004,8 @@ func RemoveCloudRepoTag(tag string) (err error) {
 			util.PushErrMsg(Conf.Language(214), 5000)
 			return
 		}
+	case conf.ProviderIroh:
+		// Iroh is self-hosted, no subscription required
 	}
 
 	err = repo.RemoveCloudRepoTag(tag)
@@ -1032,6 +1038,8 @@ func GetCloudRepoTagSnapshots() (ret []*dejavu.Log, err error) {
 			util.PushErrMsg(Conf.Language(214), 5000)
 			return
 		}
+	case conf.ProviderIroh:
+		// Iroh is self-hosted, no subscription required
 	}
 
 	logs, err := repo.GetCloudRepoTagLogs(map[string]any{eventbus.CtxPushMsg: eventbus.CtxPushMsgToStatusBar})
@@ -1068,6 +1076,8 @@ func GetCloudRepoSnapshots(page int) (ret []*dejavu.Log, pageCount, totalCount i
 			util.PushErrMsg(Conf.Language(214), 5000)
 			return
 		}
+	case conf.ProviderIroh:
+		// Iroh is self-hosted, no subscription required
 	}
 
 	if 1 > page {
@@ -1934,6 +1944,10 @@ func logSyncMergeResult(mergeResult *dejavu.MergeResult) {
 }
 
 func needFullReindex(upsertTrees int) bool {
+	if upsertTrees < 32 {
+		// Small number of upserts should use incremental reindex, not full rebuild
+		return false
+	}
 	return 0.2 < float64(upsertTrees)/float64(treenode.CountTrees())
 }
 
@@ -2017,6 +2031,13 @@ func newRepository() (ret *dejavu.Repo, err error) {
 		cloudRepo = cloud.NewWebDAV(&cloud.BaseCloud{Conf: cloudConf}, webdavClient)
 	case conf.ProviderLocal:
 		cloudRepo = cloud.NewLocal(&cloud.BaseCloud{Conf: cloudConf})
+	case conf.ProviderIroh:
+		var ticket string
+		if Conf.Sync.Iroh != nil {
+			ticket = Conf.Sync.Iroh.Ticket
+		}
+		irohNode := InitIrohNode(ticket)
+		cloudRepo = NewIrohCloud(cloudConf, irohNode)
 	default:
 		err = fmt.Errorf("unknown cloud provider [%d]", Conf.Sync.Provider)
 		return
@@ -2307,6 +2328,8 @@ func buildCloudConf() (ret *cloud.Conf, err error) {
 			Timeout:        Conf.Sync.Local.Timeout,
 			ConcurrentReqs: Conf.Sync.Local.ConcurrentReqs,
 		}
+	case conf.ProviderIroh:
+		// Iroh uses its own P2P transport; no traditional cloud conf needed
 	default:
 		err = fmt.Errorf("invalid provider [%d]", Conf.Sync.Provider)
 		return

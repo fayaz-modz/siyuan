@@ -367,6 +367,24 @@ We release insider preview before major updates, please visit [https://github.co
 
 See [Development Guide](https://github.com/siyuan-note/siyuan/blob/master/.github/CONTRIBUTING.md).
 
+### Compiling Iroh FFI Bindings
+
+If you are updating or compiling the Iroh FFI bindings for SiYuan, please follow this workflow:
+
+1. **Generate the Golang bindings**:
+   ```shell
+   cargo run --bin uniffi-bindgen generate --language golang --out-dir miaow --config uniffi.toml --library target/build/iroh_ffi.so
+   ```
+2. **Copy files to the kernel**:
+   - Copy the generated `.go` and `.h` files from `miaow/` to `kernel/model/iroh/`
+   - Copy `libiroh_ffi.so` to `kernel/model/iroh/`
+3. **Android Build Exception**:
+   For Android builds, the `.so` file must be deleted from `kernel/model/iroh/`. Instead, compile the static library using:
+   ```shell
+   cargo ndk -t arm64-v8a build --release
+   ```
+   Then copy the resulting `libiroh_ffi.a` to `kernel/model/iroh/`.
+
 ## ❓ FAQ
 
 ### How does SiYuan store data?
