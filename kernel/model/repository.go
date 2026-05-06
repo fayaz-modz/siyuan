@@ -756,8 +756,15 @@ func InitRepoKeyFromPassphrase(passphrase string) (err error) {
 	}
 
 	util.PushMsg(Conf.Language(136), 3000)
-	if err = os.RemoveAll(Conf.Repo.GetSaveDir()); err != nil {
-		return
+	// For Iroh P2P sync, preserve existing repo so that first-time sync can
+	// perform a proper merge instead of overwriting the joiner's data.
+	// Cloud providers need a clean slate because the old encrypted data is
+	// useless with a new key, but Iroh peers each have their own independent
+	// repo that must be preserved for merging.
+	if conf.ProviderIroh != Conf.Sync.Provider {
+		if err = os.RemoveAll(Conf.Repo.GetSaveDir()); err != nil {
+			return
+		}
 	}
 	if err = os.MkdirAll(Conf.Repo.GetSaveDir(), 0755); err != nil {
 		return
